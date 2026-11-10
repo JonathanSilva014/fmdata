@@ -132,18 +132,14 @@ async function pedir<T>(caminho: string, params?: Params): Promise<T> {
 }
 
 /**
- * Aceita tanto `[...]` como `{ scrobbles: [...] }` / `{ items: [...] }` / `{ data: [...] }`.
- * ⚠️ Quando confirmares em /docs o formato real, podes simplificar isto.
+ * A API devolve as listas como array direto (`[...]`), confirmado em /scrobbles.
+ * Se vier outra coisa, é um erro do servidor e mostra-se o estado de erro.
  */
-function comoLista<T>(corpo: unknown, endpoint: string): T[] {
-  if (Array.isArray(corpo)) return corpo as T[];
-  if (corpo && typeof corpo === "object") {
-    for (const chave of ["scrobbles", "items", "data", "results"]) {
-      const valor = (corpo as Record<string, unknown>)[chave];
-      if (Array.isArray(valor)) return valor as T[];
-    }
+function exigirLista<T>(corpo: unknown, endpoint: string): T[] {
+  if (!Array.isArray(corpo)) {
+    throw new ApiError("server", `Formato inesperado na resposta de ${endpoint}.`);
   }
-  throw new ApiError("server", `Formato inesperado na resposta de ${endpoint}.`);
+  return corpo as T[];
 }
 
 /** Evita pedidos com nome vazio (a API responderia 400). */
@@ -164,12 +160,12 @@ export async function obterHealth(): Promise<HealthResponse> {
 
 /** GET /scrobbles — histórico completo de audições. */
 export async function obterScrobbles(): Promise<Scrobble[]> {
-  return comoLista<Scrobble>(await pedir<unknown>("/scrobbles"), "/scrobbles");
+  return exigirLista<Scrobble>(await pedir<unknown>("/scrobbles"), "/scrobbles");
 }
 
 /** GET /scrobbles/amostra — subconjunto pequeno, útil para testar funções puras. */
 export async function obterAmostraScrobbles(): Promise<Scrobble[]> {
-  return comoLista<Scrobble>(await pedir<unknown>("/scrobbles/amostra"), "/scrobbles/amostra");
+  return exigirLista<Scrobble>(await pedir<unknown>("/scrobbles/amostra"), "/scrobbles/amostra");
 }
 
 /** GET /artist-info — perfil do artista. 404 → `ApiError` com tipo "not-found". */
@@ -191,7 +187,7 @@ export async function obterAlbumInfo(artista: string, album: string): Promise<Al
  * os gráficos devem usar as funções puras (é isso que é avaliado).
  */
 export async function obterListeningClock(): Promise<HourCount[]> {
-  return comoLista<HourCount>(await pedir<unknown>("/stats/listening-clock"), "/stats/listening-clock");
+  return exigirLista<HourCount>(await pedir<unknown>("/stats/listening-clock"), "/stats/listening-clock");
 }
 
 // ---------------------------------------------------------------------------
