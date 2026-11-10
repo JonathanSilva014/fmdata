@@ -7,6 +7,7 @@ import type {
   ArtistInfo,
   HealthResponse,
   HourCount,
+  RespostaImagem,
   Scrobble,
 } from "@/types";
 
@@ -14,7 +15,9 @@ export const API_BASE = "https://fmdata-api.onrender.com";
 
 /**
  * Nomes dos parâmetros de query de cada endpoint.
- * ⚠️ CONFIRMAR EM /docs (secção "Parameters" de cada endpoint).
+ * - artist: ✅ confirmado (/artist-info?artist=Adele, /artist-image?artist=Adele)
+ * - album: ✅ confirmado (/album-info?artist=Adele&album=25)
+ * - track: ⚠️ por confirmar em /docs (só usado em /track-image)
  * Se algum estiver errado, a API responde 400 — corrige só aqui.
  */
 export const PARAM = {
@@ -191,19 +194,33 @@ export async function obterListeningClock(): Promise<HourCount[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Imagens: URLs para usar diretamente em <img src>, sem fetch.
-// ⚠️ Confirmar em /docs se estes endpoints devolvem a imagem (ou redirect).
-//    Se devolverem JSON com um URL, é preciso trocar por funções com `pedir`.
+// Imagens: os endpoints devolvem JSON com o URL (confirmado em /artist-image:
+// { "artist": "Adele", "image_url": "https://..." }), não a imagem em si.
+// Devolvem só o URL, ou null se não houver imagem.
 // ---------------------------------------------------------------------------
 
-export function urlImagemArtista(nome: string): string {
-  return construirUrl("/artist-image", { [PARAM.artista]: nome });
+async function obterUrlImagem(caminho: string, params: Params): Promise<string | null> {
+  const corpo = await pedir<RespostaImagem>(caminho, params);
+  return corpo.image_url?.trim() ? corpo.image_url : null;
 }
 
-export function urlImagemAlbum(artista: string, album: string): string {
-  return construirUrl("/album-image", { [PARAM.artista]: artista, [PARAM.album]: album });
+/** GET /artist-image — foto do artista (para o top 20 do dashboard). */
+export async function obterImagemArtista(nome: string): Promise<string | null> {
+  return obterUrlImagem("/artist-image", { [PARAM.artista]: exigir(nome, "nome do artista") });
 }
 
-export function urlImagemFaixa(artista: string, faixa: string): string {
-  return construirUrl("/track-image", { [PARAM.artista]: artista, [PARAM.faixa]: faixa });
+/** GET /album-image — capa do álbum. */
+export async function obterImagemAlbum(artista: string, album: string): Promise<string | null> {
+  return obterUrlImagem("/album-image", {
+    [PARAM.artista]: exigir(artista, "nome do artista"),
+    [PARAM.album]: exigir(album, "nome do álbum"),
+  });
+}
+
+/** GET /track-image — capa da faixa. ⚠️ Confirmar o parâmetro `track` em /docs. */
+export async function obterImagemFaixa(artista: string, faixa: string): Promise<string | null> {
+  return obterUrlImagem("/track-image", {
+    [PARAM.artista]: exigir(artista, "nome do artista"),
+    [PARAM.faixa]: exigir(faixa, "nome da faixa"),
+  });
 }

@@ -5,6 +5,15 @@
  */
 export * from "./api";
 
+/**
+ * Resposta de /artist-image, /album-image e /track-image.
+ * Confirmado em /artist-image: { "artist": "Adele", "image_url": "https://..." }.
+ * Só usamos `image_url`; os outros campos variam conforme o endpoint.
+ */
+export interface RespostaImagem {
+  image_url: string | null;
+}
+
 /** Opções do filtro de período do dashboard. */
 export type Periodo = "tudo" | "30d" | "14d" | "7d" | "24h";
 
