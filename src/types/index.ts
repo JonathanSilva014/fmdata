@@ -39,6 +39,16 @@ export interface ItemRanking {
   subtitulo?: string;
   contagem: number;
   imagem?: string | null;
+  /** Nome do artista tal como vem da API: serve para o link /artistas/[nome]. */
+  artista?: string;
+  /** Álbum (top músicas e top álbuns). */
+  album?: string;
+}
+
+/** Género mais ouvido (a partir das tags). */
+export interface GeneroContagem {
+  genero: string;
+  contagem: number;
 }
 
 /** Ponto do gráfico de scrobbles por mês. */
@@ -46,6 +56,37 @@ export interface PontoMensal {
   /** Ano-mês em UTC, ex.: "2024-03". */
   mes: string;
   contagem: number;
+}
+
+/** Cartões de estatísticas da página do artista. */
+export interface ResumoArtista {
+  /** N.º de audições do artista. */
+  total: number;
+  /** Percentagem das tuas audições (0–100). */
+  percentagem: number;
+  /** N.º de faixas DISTINTAS marcadas como favoritas (loved = 1). */
+  favoritas: number;
+  primeira: Date | null;
+  ultima: Date | null;
+}
+
+/** Álbum de um artista, visto a partir dos scrobbles. */
+export interface AlbumDoArtista {
+  /** Nome do álbum normalizado. */
+  chave: string;
+  nome: string;
+  artista: string;
+  imagem: string | null;
+  /** N.º de audições deste álbum. */
+  contagem: number;
+  /** Faixas distintas ouvidas, normalizadas (o "X" de "Ouviste X de Y faixas"). */
+  faixasOuvidas: string[];
+}
+
+/** "Ouviste X de Y faixas". `total` é null se não houver info do álbum. */
+export interface Cobertura {
+  ouvidas: number;
+  total: number | null;
 }
 
 /** Artista semelhante, marcado se já aparece nos scrobbles do utilizador. */

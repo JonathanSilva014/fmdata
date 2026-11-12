@@ -1,5 +1,16 @@
 /**
  * Camada de pedidos à API fmdata.
+ *
+ * É o ÚNICO sítio do projeto que faz `fetch`. As funções de `lib/` continuam
+ * puras (sem rede, sem store), como exige o enunciado.
+ *
+ * Responsabilidades:
+ *  - construir URLs (os parâmetros são codificados automaticamente pelo URLSearchParams)
+ *  - traduzir respostas HTTP em dados tipados ou em `ApiError`
+ *  - aguentar o "acordar" lento do servidor (timeout largo)
+ *
+ * NÃO faz cache nem deduplicação: isso é trabalho da store (store/useStore.ts).
+ *
  * Docs da API: https://fmdata-api.onrender.com/docs
  */
 import type {

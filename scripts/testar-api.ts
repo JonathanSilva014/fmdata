@@ -23,6 +23,7 @@ import {
   obterScrobbles,
   obterImagemArtista,
 } from "../src/services/api";
+import { horaDePico, scrobblesPorHora } from "../src/lib/stats";
 
 function titulo(texto: string) {
   console.log(`\n=== ${texto} ===`);
@@ -118,9 +119,18 @@ async function main() {
     }
   }
 
-  titulo("/stats/listening-clock");
+  titulo("/stats/listening-clock vs scrobblesPorHora() de lib/stats.ts");
   try {
-    console.log("  ✓", await obterListeningClock());
+    const daApi = await obterListeningClock();
+    const nossas = scrobblesPorHora(todos);
+    const diferentes = daApi.filter((h) => nossas[h.hour] !== h.scrobbles);
+    console.log("  API:   ", daApi.map((h) => h.scrobbles).join(" "));
+    console.log("  lib/:  ", nossas.join(" "));
+    console.log(
+      diferentes.length === 0
+        ? `  ✓ As 24 horas batem certo. Hora de pico: ${horaDePico(nossas)}h UTC`
+        : `  ✗ ${diferentes.length} hora(s) diferentes: ${diferentes.map((h) => h.hour).join(", ")}`,
+    );
   } catch (e) {
     falha(e);
   }
