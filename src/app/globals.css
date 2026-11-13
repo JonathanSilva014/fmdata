@@ -1,26 +1,108 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Tokens de design em três camadas (skill design-system):
+ *   1. Primitivos   → a paleta do projeto (creme, vermelho, rosa, tinta…)
+ *   2. Semânticos   → para que serve cada cor (fundo, superfície, texto, destaque…)
+ *   3. Componentes  → valores de um componente concreto (gráficos, papel quadriculado)
+ * Os componentes só usam as camadas 2 e 3: mudar o tema é mudar só este ficheiro.
+ *
+ * Estilo: vermelho e branco (maqueta aprovada) — papel quadriculado, linhas
+ * vermelhas finas e títulos em letra larga, itálica e maiúscula.
+ * Contraste (skill impeccable): vermelho #C81E26 sobre creme ≈ 5,2:1;
+ * texto suave #5C5552 sobre creme ≈ 6,4:1; branco sobre o vermelho ≈ 6:1.
+ */
+
+/* 1. Primitivos */
+@theme {
+  --color-creme: #f3f0ea;
+  --color-branco: #ffffff;
+  --color-cinza-claro: #e9e7e3;
+  --color-rosa: #f6d9d7;
+  --color-vermelho-linha: #e7b3b0;
+  --color-vermelho-barra: #f0b4b1;
+  --color-vermelho: #c81e26;
+  --color-vermelho-escuro: #8f141a;
+  --color-tinta: #1a1a1a;
+  --color-tinta-suave: #5c5552;
+  --color-grafite: #1e1e1e;
 }
 
+/* 2. Semânticos — geram utilitários: bg-fundo, text-texto-suave, border-borda… */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-fundo: var(--color-creme);
+  --color-superficie: var(--color-branco);
+  --color-superficie-alta: var(--color-rosa);
+  --color-superficie-cinza: var(--color-cinza-claro);
+  --color-borda: var(--color-vermelho-linha);
+  --color-borda-forte: var(--color-vermelho);
+  --color-texto: var(--color-tinta);
+  --color-texto-suave: var(--color-tinta-suave);
+  --color-destaque: var(--color-vermelho);
+  --color-destaque-forte: var(--color-vermelho);
+  --color-destaque-claro: var(--color-vermelho-escuro);
+  /* Texto por cima do vermelho: branco */
+  --color-sobre-destaque: var(--color-branco);
+  --color-perigo: var(--color-vermelho-escuro);
+  --color-rodape: var(--color-grafite);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-archivo);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* 3. Componentes */
+:root {
+  color-scheme: light;
+  /* O topo do dashboard passa por baixo do cabeçalho: os dois usam esta altura */
+  --altura-cabecalho: 4.5rem;
+  --grafico-barra: var(--color-vermelho-barra);
+  --grafico-pico: var(--color-vermelho);
+  --grelha: rgb(200 30 38 / 0.08);
+}
+
+/* Títulos: letra larga, itálica e maiúscula (a assinatura do estilo) */
+@utility titulo-display {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 900;
+  font-stretch: 125%;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+}
+
+/* Papel quadriculado com linhas vermelhas finas */
+@utility papel {
+  background-color: var(--color-fundo);
+  background-image:
+    linear-gradient(var(--grelha) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grelha) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Superfícies do browser também seguem a paleta (skill impeccable: craft floor) */
+@layer base {
+  body {
+    background: var(--color-fundo);
+    color: var(--color-texto);
+    font-family: var(--font-sans), system-ui, sans-serif;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  ::selection {
+    background: var(--color-vermelho);
+    color: var(--color-branco);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-destaque);
+    outline-offset: 2px;
+  }
+
+  html {
+    scrollbar-color: var(--color-vermelho-linha) var(--color-fundo);
+  }
+
+  a {
+    text-underline-offset: 3px;
+  }
 }

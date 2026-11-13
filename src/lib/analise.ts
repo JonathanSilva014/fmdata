@@ -100,3 +100,23 @@ export function artistasDeMomento(
     .sort((a, b) => b.percentagem - a.percentagem || b.total - a.total || a.artista.localeCompare(b.artista, "pt"))
     .slice(0, limite);
 }
+
+export interface MomentoComArtistas {
+  momento: MomentoDoDia;
+  de: number;
+  ate: number;
+  artistas: ArtistaDeMomento[];
+}
+
+/**
+ * Os 4 momentos do dia, por ordem (madrugada → noite), cada um com os seus
+ * artistas: é a forma da linha do tempo. Momentos sem artistas vêm com [] .
+ */
+export function agruparPorMomento(itens: ArtistaDeMomento[]): MomentoComArtistas[] {
+  return MOMENTOS.map(({ momento, de, ate }) => ({
+    momento,
+    de,
+    ate,
+    artistas: itens.filter((a) => a.momento === momento),
+  }));
+}

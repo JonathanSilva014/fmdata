@@ -70,16 +70,16 @@ export function rankingPor(
 // Chaves (nunca só o título: "Hello" da Adele ≠ "Hello" de outro artista)
 // ---------------------------------------------------------------------------
 
-export const chaveArtista: Chave<Scrobble> = (s) => normalizarNome(s.artist_name) || null;
+const chaveArtista: Chave<Scrobble> = (s) => normalizarNome(s.artist_name) || null;
 
-export const chaveMusica: Chave<Scrobble> = (s) => {
+const chaveMusica: Chave<Scrobble> = (s) => {
   const artista = normalizarNome(s.artist_name);
   const faixa = normalizarNome(s.track_name);
   return artista && faixa ? `${artista}::${faixa}` : null;
 };
 
 /** Audições sem álbum são ignoradas (não há capa nem título para mostrar). */
-export const chaveAlbum: Chave<Scrobble> = (s) => {
+const chaveAlbum: Chave<Scrobble> = (s) => {
   const artista = normalizarNome(s.artist_name);
   const album = normalizarNome(s.album_name);
   return artista && album ? `${artista}::${album}` : null;

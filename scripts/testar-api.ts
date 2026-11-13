@@ -30,15 +30,15 @@ function titulo(texto: string) {
 }
 
 function falha(e: unknown) {
-  if (e instanceof ApiError) console.log(`  ✗ ${e.tipo} (${e.status ?? "-"}): ${e.message}`);
-  else console.log("  ✗", e);
+  if (e instanceof ApiError) console.log(`  FALHA ${e.tipo} (${e.status ?? "-"}): ${e.message}`);
+  else console.log("  FALHA", e);
 }
 
 async function main() {
   titulo("/health");
   try {
     const t0 = Date.now();
-    console.log("  ✓", await obterHealth(), `(${Date.now() - t0} ms)`);
+    console.log("  OK", await obterHealth(), `(${Date.now() - t0} ms)`);
   } catch (e) {
     falha(e);
     return;
@@ -48,7 +48,7 @@ async function main() {
   try {
     const amostra = await obterAmostraScrobbles();
     writeFileSync("scripts/amostra.json", JSON.stringify(amostra, null, 2));
-    console.log(`  ✓ ${amostra.length} registos → guardados em scripts/amostra.json`);
+    console.log(`  OK ${amostra.length} registos → guardados em scripts/amostra.json`);
     console.log("  Primeiro registo:", amostra[0]);
   } catch (e) {
     falha(e);
@@ -60,11 +60,11 @@ async function main() {
     const t0 = Date.now();
     todos = await obterScrobbles();
     const kb = Math.round(JSON.stringify(todos).length / 1024);
-    console.log(`  ✓ ${todos.length} registos em ${Date.now() - t0} ms, ~${kb} KB`);
+    console.log(`  OK ${todos.length} registos em ${Date.now() - t0} ms, ~${kb} KB`);
     console.log(
       kb > 4000
-        ? "  ⚠️ Demasiado grande para localStorage (~5 MB): não persistir os scrobbles completos."
-        : "  ✓ Cabe em localStorage.",
+        ? "  AVISO: Demasiado grande para localStorage (~5 MB): não persistir os scrobbles completos."
+        : "  OK Cabe em localStorage.",
     );
 
     const semData = todos.filter((s) => s.date_uts === null).length;
@@ -88,7 +88,7 @@ async function main() {
   titulo(`/artist-info → "${artista}" (deve existir)`);
   try {
     const info = await obterArtistInfo(artista);
-    console.log("  ✓", { ...info, bio_content: `${info.bio_content.slice(0, 80)}…` });
+    console.log("  OK", { ...info, bio_content: `${info.bio_content.slice(0, 80)}…` });
   } catch (e) {
     falha(e);
   }
@@ -96,7 +96,7 @@ async function main() {
   titulo("/artist-info → artista inventado (esperado: not-found / 404)");
   try {
     await obterArtistInfo("zzz-artista-que-nao-existe-123");
-    console.log("  ⚠️ Não deu 404. Ver o que a API devolve neste caso.");
+    console.log("  AVISO: Não deu 404. Ver o que a API devolve neste caso.");
   } catch (e) {
     falha(e);
   }
@@ -112,8 +112,8 @@ async function main() {
     titulo(`/album-info → "${artista}" / "${album}"`);
     try {
       const info = await obterAlbumInfo(artista, album);
-      console.log("  ✓ track_count:", info.track_count);
-      console.log("  ✓ tracklist_names:", info.tracklist_names.split(";").map((t) => t.trim()));
+      console.log("  OK track_count:", info.track_count);
+      console.log("  OK tracklist_names:", info.tracklist_names.split(";").map((t) => t.trim()));
     } catch (e) {
       falha(e);
     }
@@ -128,8 +128,8 @@ async function main() {
     console.log("  lib/:  ", nossas.join(" "));
     console.log(
       diferentes.length === 0
-        ? `  ✓ As 24 horas batem certo. Hora de pico: ${horaDePico(nossas)}h UTC`
-        : `  ✗ ${diferentes.length} hora(s) diferentes: ${diferentes.map((h) => h.hour).join(", ")}`,
+        ? `  OK As 24 horas batem certo. Hora de pico: ${horaDePico(nossas)}h UTC`
+        : `  FALHA ${diferentes.length} hora(s) diferentes: ${diferentes.map((h) => h.hour).join(", ")}`,
     );
   } catch (e) {
     falha(e);
@@ -137,7 +137,7 @@ async function main() {
 
   titulo(`/artist-image → "${artista}"`);
   try {
-    console.log("  ✓", await obterImagemArtista(artista));
+    console.log("  OK", await obterImagemArtista(artista));
   } catch (e) {
     falha(e);
   }

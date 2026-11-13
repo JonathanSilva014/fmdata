@@ -22,19 +22,17 @@ import type {
   Scrobble,
 } from "@/types";
 
-export const API_BASE = "https://fmdata-api.onrender.com";
+const API_BASE = "https://fmdata-api.onrender.com";
 
 /**
  * Nomes dos parâmetros de query de cada endpoint.
- * - artist: ✅ confirmado (/artist-info?artist=Adele, /artist-image?artist=Adele)
- * - album: ✅ confirmado (/album-info?artist=Adele&album=25)
- * - track: ⚠️ por confirmar em /docs (só usado em /track-image)
+ * - artist: confirmado (/artist-info?artist=Adele, /artist-image?artist=Adele)
+ * - album: confirmado (/album-info?artist=Adele&album=25)
  * Se algum estiver errado, a API responde 400 — corrige só aqui.
  */
 export const PARAM = {
   artista: "artist",
   album: "album",
-  faixa: "track",
 } as const;
 
 /** O Render gratuito pode demorar ~1 min a acordar no primeiro pedido. */
@@ -51,7 +49,7 @@ const TIMEOUT_MS = 60_000;
  * - network     → sem ligação / pedido bloqueado
  * - timeout     → a API não respondeu a tempo
  */
-export type TipoErroApi = "not-found" | "bad-request" | "server" | "network" | "timeout";
+type TipoErroApi = "not-found" | "bad-request" | "server" | "network" | "timeout";
 
 export class ApiError extends Error {
   constructor(
@@ -86,7 +84,7 @@ type Params = Record<string, string | number | undefined>;
  * Constrói o URL completo. `URLSearchParams` codifica os valores
  * (espaços, acentos, "&", "/"...), por isso nomes como "AC/DC" são seguros.
  */
-export function construirUrl(caminho: string, params: Params = {}): string {
+function construirUrl(caminho: string, params: Params = {}): string {
   const url = new URL(caminho, API_BASE);
   for (const [chave, valor] of Object.entries(params)) {
     if (valor !== undefined && valor !== "") url.searchParams.set(chave, String(valor));
@@ -205,33 +203,12 @@ export async function obterListeningClock(): Promise<HourCount[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Imagens: os endpoints devolvem JSON com o URL (confirmado em /artist-image:
+// Imagens: /artist-image devolve JSON com o URL (confirmado:
 // { "artist": "Adele", "image_url": "https://..." }), não a imagem em si.
-// Devolvem só o URL, ou null se não houver imagem.
 // ---------------------------------------------------------------------------
 
-async function obterUrlImagem(caminho: string, params: Params): Promise<string | null> {
-  const corpo = await pedir<RespostaImagem>(caminho, params);
-  return corpo.image_url?.trim() ? corpo.image_url : null;
-}
-
-/** GET /artist-image — foto do artista (para o top 20 do dashboard). */
+/** GET /artist-image — foto do artista (top 20 do dashboard), ou null se não houver. */
 export async function obterImagemArtista(nome: string): Promise<string | null> {
-  return obterUrlImagem("/artist-image", { [PARAM.artista]: exigir(nome, "nome do artista") });
-}
-
-/** GET /album-image — capa do álbum. */
-export async function obterImagemAlbum(artista: string, album: string): Promise<string | null> {
-  return obterUrlImagem("/album-image", {
-    [PARAM.artista]: exigir(artista, "nome do artista"),
-    [PARAM.album]: exigir(album, "nome do álbum"),
-  });
-}
-
-/** GET /track-image — capa da faixa. ⚠️ Confirmar o parâmetro `track` em /docs. */
-export async function obterImagemFaixa(artista: string, faixa: string): Promise<string | null> {
-  return obterUrlImagem("/track-image", {
-    [PARAM.artista]: exigir(artista, "nome do artista"),
-    [PARAM.faixa]: exigir(faixa, "nome da faixa"),
-  });
+  const corpo = await pedir<RespostaImagem>("/artist-image", { [PARAM.artista]: exigir(nome, "nome do artista") });
+  return corpo.image_url?.trim() ? corpo.image_url : null;
 }

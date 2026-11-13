@@ -40,11 +40,6 @@ export function parseDataScrobble(s: Scrobble): Date | null {
   return ms === null ? null : new Date(ms);
 }
 
-/** Diz se a audição pode entrar em cálculos temporais. */
-export function temDataValida(s: Scrobble): boolean {
-  return timestampScrobble(s) !== null;
-}
-
 /**
  * Data da audição MAIS RECENTE: a âncora de todos os períodos.
  * "Últimas 24 horas" conta a partir daqui, não a partir de agora.

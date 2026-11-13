@@ -19,12 +19,6 @@ import { chaveDoMes, mesesEntre, timestampScrobble } from "./dates";
 import { normalizarNome, removerSemData, separarLista } from "./filters";
 import { contarPor, rankingPor } from "./stats";
 
-/** Diz se o artista aparece nos dados. Decide a página "não encontrado". */
-export function artistaExiste(scrobbles: Scrobble[], nome: string): boolean {
-  const alvo = normalizarNome(nome);
-  return alvo !== "" && scrobbles.some((s) => normalizarNome(s.artist_name) === alvo);
-}
-
 /**
  * Cartões de estatísticas: total, percentagem, favoritas, primeira e última.
  * As audições sem data ("a tocar agora") não contam, nem no artista nem no total,

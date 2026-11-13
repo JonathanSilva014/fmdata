@@ -42,7 +42,7 @@ let falhas = 0;
 function verificar(descricao: string, obtido: unknown, esperado: unknown) {
   const ok = JSON.stringify(obtido) === JSON.stringify(esperado);
   if (!ok) falhas++;
-  console.log(ok ? "✓" : "✗", descricao, ok ? "" : `\n    obtido:   ${JSON.stringify(obtido)}\n    esperado: ${JSON.stringify(esperado)}`);
+  console.log(ok ? "OK" : "FALHA", descricao, ok ? "" : `\n    obtido:   ${JSON.stringify(obtido)}\n    esperado: ${JSON.stringify(esperado)}`);
 }
 const contar = (caminho: string) => pedidos.filter((p) => p.startsWith(caminho)).length;
 
@@ -85,8 +85,9 @@ async function main() {
 
   console.log("\n=== Persistência (localStorage) ===");
   loja().setPeriodo("7d");
+  loja().setPeriodoDaSeccao("musicas", "tudo");
   const guardado = JSON.parse(memoria.get("fmdata") ?? "{}").state ?? {};
-  verificar("guarda o período", guardado.periodo, "7d");
+  verificar("guarda o período global e as exceções", [guardado.periodo, guardado.excecoes], ["7d", { musicas: "tudo" }]);
   verificar("NÃO guarda os scrobbles (~25 MB)", "scrobbles" in guardado, false);
   verificar("guarda perfis com resposta (success e not-found)", Object.keys(guardado.artistas).sort(), ["adele", "beyoncé", "ninguém"]);
   verificar("guarda fotos e álbuns", [Object.keys(guardado.imagensArtistas), Object.keys(guardado.albuns)], [["adele"], ["adele::25"]]);
@@ -94,16 +95,31 @@ async function main() {
   console.log("\n=== Reidratação (simula um refresh) ===");
   // Simula abrir a página de novo: memória limpa, localStorage intacto.
   const noDisco = memoria.get("fmdata") as string;
-  useStore.setState({ periodo: "tudo", artistas: {}, albuns: {}, imagensArtistas: {} });
+  useStore.setState({ periodo: "tudo", excecoes: {}, artistas: {}, albuns: {}, imagensArtistas: {} });
   memoria.set("fmdata", noDisco); // o setState acima também grava; repõe o que estava
   await useStore.persist.rehydrate();
-  verificar("período volta", loja().periodo, "7d");
+  verificar("período global e exceção voltam", [loja().periodo, loja().excecoes.musicas], ["7d", "tudo"]);
   verificar("perfil volta sem novo fetch", loja().artistas["adele"]?.data?.name, "Adele");
   const antes = contar("/artist-info");
   await loja().carregarArtista("Adele");
   verificar("depois do refresh, Adele vem da cache", contar("/artist-info"), antes);
 
-  console.log(falhas === 0 ? "\nTudo certo ✓" : `\n${falhas} teste(s) falharam ✗`);
+  console.log("\n=== Filtro global apaga as exceções ===");
+  loja().setPeriodoDaSeccao("albuns", "24h");
+  loja().setPeriodo("30d");
+  verificar("setPeriodo muda tudo e apaga exceções", [loja().periodo, loja().excecoes], ["30d", {}]);
+  loja().setPeriodoDaSeccao("horas", "30d");
+  verificar("exceção igual ao global não fica guardada", loja().excecoes, {});
+
+  console.log("\n=== Migrações do formato guardado ===");
+  memoria.set("fmdata", JSON.stringify({ state: { periodo: "14d", artistas: {}, albuns: {}, imagensArtistas: {} }, version: 1 }));
+  await useStore.persist.rehydrate();
+  verificar("v1 (um período) → v3", [loja().periodo, loja().excecoes], ["14d", {}]);
+  memoria.set("fmdata", JSON.stringify({ state: { periodos: { totais: "7d", artistas: "7d", horas: "7d", musicas: "tudo", albuns: "7d", analise: "24h" }, artistas: {}, albuns: {}, imagensArtistas: {} }, version: 2 }));
+  await useStore.persist.rehydrate();
+  verificar("v2 (um por secção) → v3: global + exceções", [loja().periodo, loja().excecoes], ["7d", { musicas: "tudo", analise: "24h" }]);
+
+  console.log(falhas === 0 ? "\nTudo certo OK" : `\n${falhas} teste(s) falharam FALHA`);
   process.exit(falhas === 0 ? 0 : 1);
 }
 

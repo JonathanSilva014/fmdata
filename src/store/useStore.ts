@@ -2,7 +2,8 @@
  * store/useStore.ts — store global (Zustand).
  *
  * Resolve os quatro problemas do enunciado:
- *  1. Estado global   → `periodo`, partilhado por todo o dashboard.
+ *  1. Estado global   → `periodo`, o filtro de todo o dashboard; cada secção pode
+ *                       ter uma exceção (`excecoes`), que o filtro global apaga.
  *  2. Cache           → cada pedido fica guardado num `Entry<T>`; se já há
  *                       resposta ("success" ou "not-found"), não se pede outra vez.
  *  3. Persistência    → middleware `persist` em localStorage, com `skipHydration`
@@ -12,16 +13,16 @@
  *
  * Decisão sobre o que persistir:
  *  O histórico completo tem ~51 700 scrobbles (~25 MB) e o localStorage aguenta
- *  ~5 MB. Por isso persistem o período e os perfis (artistas, álbuns, fotos),
- *  que são pequenos; os scrobbles ficam em cache só em memória, durante a sessão
- *  (são pedidos uma vez e partilhados por todas as páginas).
+ *  ~5 MB. Por isso no localStorage ficam o período e os perfis (artistas, álbuns,
+ *  fotos), que são pequenos; os scrobbles vão para o IndexedDB
+ *  (services/armazemLocal.ts), que aguenta o tamanho, e valem durante 1 hora.
  *
  * Os componentes não usam esta store diretamente: usam os hooks de hooks/.
  */
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
-import type { AlbumInfo, ArtistInfo, Entry, Periodo, Scrobble } from "@/types";
-import { normalizarNome } from "@/lib/filters";
+import type { AlbumInfo, ArtistInfo, Entry, ExcecoesDePeriodo, Periodo, PeriodosPorSeccao, Scrobble, Seccao } from "@/types";
+import { normalizarNome, SECCOES } from "@/lib/filters";
 import {
   isNotFound,
   mensagemDeErro,
@@ -30,12 +31,13 @@ import {
   obterImagemArtista,
   obterScrobbles,
 } from "@/services/api";
+import { guardarScrobbles, lerScrobblesGuardados } from "@/services/armazemLocal";
 
 // ---------------------------------------------------------------------------
 // Entry<T>: os estados possíveis de um dado da rede
 // ---------------------------------------------------------------------------
 
-export const entradaVazia = <T>(): Entry<T> => ({ data: null, status: "idle", error: null, updatedAt: null });
+const entradaVazia = <T>(): Entry<T> => ({ data: null, status: "idle", error: null, updatedAt: null });
 const aCarregar = <T>(anterior?: Entry<T>): Entry<T> => ({
   data: anterior?.data ?? null,
   status: "loading",
@@ -81,7 +83,10 @@ function semDuplicados(chave: string, pedido: () => Promise<void>): Promise<void
 // ---------------------------------------------------------------------------
 
 export interface StoreState {
+  /** Filtro de período de todo o dashboard. */
   periodo: Periodo;
+  /** Secções com um período diferente do global (o filtro global apaga-as). */
+  excecoes: ExcecoesDePeriodo;
   /** Histórico completo. Só em memória (não persiste: ~25 MB). */
   scrobbles: Entry<Scrobble[]>;
   /** Perfis de artista, por nome normalizado. */
@@ -91,15 +96,22 @@ export interface StoreState {
   /** Fotos de artista (top 20 do dashboard), por nome normalizado. */
   imagensArtistas: Record<string, Entry<string | null>>;
 
+  /** Muda o período de TODO o dashboard (e apaga as exceções das secções). */
   setPeriodo: (periodo: Periodo) => void;
+  /** Muda só uma secção; igual ao global deixa de ser exceção. */
+  setPeriodoDaSeccao: (seccao: Seccao, periodo: Periodo) => void;
   carregarScrobbles: () => Promise<void>;
   carregarArtista: (nome: string) => Promise<void>;
   carregarAlbum: (artista: string, album: string) => Promise<void>;
   carregarImagemArtista: (nome: string) => Promise<void>;
 }
 
+/** Os registos de perfis em cache, e o tipo de dado de cada um. */
+type Registos = Pick<StoreState, "artistas" | "albuns" | "imagensArtistas">;
+type DadoDe<K extends keyof Registos> = Registos[K][string] extends Entry<infer T> ? T : never;
+
 /** Parte da store que vai para o localStorage. */
-type EstadoPersistido = Pick<StoreState, "periodo" | "artistas" | "albuns" | "imagensArtistas">;
+type EstadoPersistido = Pick<StoreState, "periodo" | "excecoes" | "artistas" | "albuns" | "imagensArtistas">;
 
 /** Só guarda respostas definitivas: nunca "loading" (ficaria preso) nem "error". */
 function soRespostas<T>(registo: Record<string, Entry<T>>): Record<string, Entry<T>> {
@@ -140,81 +152,97 @@ const localStorageSeguro: StateStorage = {
 
 export const useStore = create<StoreState>()(
   persist(
-    (set, get) => ({
-      periodo: "tudo",
-      scrobbles: entradaVazia<Scrobble[]>(),
-      artistas: {},
-      albuns: {},
-      imagensArtistas: {},
-
-      setPeriodo: (periodo) => set({ periodo }),
-
-      carregarScrobbles: () => {
-        if (temResposta(get().scrobbles)) return Promise.resolve();
-        return semDuplicados("scrobbles", async () => {
-          set((s) => ({ scrobbles: aCarregar(s.scrobbles) }));
+    (set, get) => {
+      /**
+       * Os três registos (artistas, álbuns, fotos) carregam-se da mesma maneira:
+       * cache → deduplicação → loading → sucesso / não encontrado / erro.
+       */
+      function carregarNoRegisto<K extends keyof Registos>(
+        campo: K,
+        chave: string,
+        pedido: () => Promise<DadoDe<K>>,
+      ): Promise<void> {
+        if (!chave || temResposta(get()[campo][chave])) return Promise.resolve();
+        return semDuplicados(`${campo}:${chave}`, async () => {
+          const guardar = (entrada: Entry<DadoDe<K>>) =>
+            set((s) => ({ [campo]: { ...s[campo], [chave]: entrada } }) as Partial<StoreState>);
+          guardar(aCarregar(get()[campo][chave] as Entry<DadoDe<K>> | undefined));
           try {
-            set({ scrobbles: comSucesso(await obterScrobbles()) });
+            guardar(comSucesso(await pedido()));
           } catch (erro) {
-            set({ scrobbles: comErro<Scrobble[]>(erro) });
+            guardar(isNotFound(erro) ? naoEncontrado() : comErro(erro));
           }
         });
-      },
+      }
 
-      carregarArtista: (nome) => {
-        const chave = chaveCacheArtista(nome);
-        if (!chave || temResposta(get().artistas[chave])) return Promise.resolve();
-        return semDuplicados(`artista:${chave}`, async () => {
-          set((s) => ({ artistas: { ...s.artistas, [chave]: aCarregar(s.artistas[chave]) } }));
-          let entrada: Entry<ArtistInfo>;
-          try {
-            entrada = comSucesso(await obterArtistInfo(nome));
-          } catch (erro) {
-            entrada = isNotFound(erro) ? naoEncontrado() : comErro(erro);
-          }
-          set((s) => ({ artistas: { ...s.artistas, [chave]: entrada } }));
-        });
-      },
+      return {
+        periodo: "tudo",
+        excecoes: {},
+        scrobbles: entradaVazia<Scrobble[]>(),
+        artistas: {},
+        albuns: {},
+        imagensArtistas: {},
 
-      carregarAlbum: (artista, album) => {
-        const chave = chaveCacheAlbum(artista, album);
-        if (temResposta(get().albuns[chave])) return Promise.resolve();
-        return semDuplicados(`album:${chave}`, async () => {
-          set((s) => ({ albuns: { ...s.albuns, [chave]: aCarregar(s.albuns[chave]) } }));
-          let entrada: Entry<AlbumInfo>;
-          try {
-            entrada = comSucesso(await obterAlbumInfo(artista, album));
-          } catch (erro) {
-            entrada = isNotFound(erro) ? naoEncontrado() : comErro(erro);
-          }
-          set((s) => ({ albuns: { ...s.albuns, [chave]: entrada } }));
-        });
-      },
+        setPeriodo: (periodo) => set({ periodo, excecoes: {} }),
+        setPeriodoDaSeccao: (seccao, periodo) =>
+          set((s) => {
+            const excecoes = { ...s.excecoes };
+            if (periodo === s.periodo) delete excecoes[seccao];
+            else excecoes[seccao] = periodo;
+            return { excecoes };
+          }),
 
-      carregarImagemArtista: (nome) => {
-        const chave = chaveCacheArtista(nome);
-        if (!chave || temResposta(get().imagensArtistas[chave])) return Promise.resolve();
-        return semDuplicados(`imagem:${chave}`, async () => {
-          set((s) => ({
-            imagensArtistas: { ...s.imagensArtistas, [chave]: aCarregar(s.imagensArtistas[chave]) },
-          }));
-          let entrada: Entry<string | null>;
-          try {
-            entrada = comSucesso(await obterImagemArtista(nome));
-          } catch (erro) {
-            entrada = isNotFound(erro) ? naoEncontrado() : comErro(erro);
-          }
-          set((s) => ({ imagensArtistas: { ...s.imagensArtistas, [chave]: entrada } }));
-        });
-      },
-    }),
+        carregarScrobbles: () => {
+          if (temResposta(get().scrobbles)) return Promise.resolve();
+          return semDuplicados("scrobbles", async () => {
+            set((s) => ({ scrobbles: aCarregar(s.scrobbles) }));
+            // 1.º o IndexedDB: depois de um refresh, o histórico já lá está e não se pede outra vez.
+            const guardado = await lerScrobblesGuardados(Date.now());
+            if (guardado) {
+              set({ scrobbles: { data: guardado.dados, status: "success", error: null, updatedAt: guardado.em } });
+              return;
+            }
+            try {
+              const dados = await obterScrobbles();
+              const agora = Date.now();
+              set({ scrobbles: { data: dados, status: "success", error: null, updatedAt: agora } });
+              void guardarScrobbles(dados, agora);
+            } catch (erro) {
+              set({ scrobbles: comErro<Scrobble[]>(erro) });
+            }
+          });
+        },
+
+        carregarArtista: (nome) =>
+          carregarNoRegisto("artistas", chaveCacheArtista(nome), () => obterArtistInfo(nome)),
+
+        carregarAlbum: (artista, album) =>
+          carregarNoRegisto("albuns", chaveCacheAlbum(artista, album), () => obterAlbumInfo(artista, album)),
+
+        carregarImagemArtista: (nome) =>
+          carregarNoRegisto("imagensArtistas", chaveCacheArtista(nome), () => obterImagemArtista(nome)),
+      };
+    },
     {
       name: "fmdata",
-      version: 1,
+      // v1: só `periodo`; v2: `periodos`, um por secção; v3: `periodo` global + `excecoes`.
+      version: 3,
+      migrate: (guardado, versao) => {
+        const antigo = (guardado ?? {}) as Partial<EstadoPersistido> & { periodos?: PeriodosPorSeccao };
+        if (versao === 2 && antigo.periodos) {
+          const { periodos, ...resto } = antigo;
+          // O global passa a ser o dos totais; as secções diferentes ficam como exceção.
+          const periodo = periodos.totais ?? "tudo";
+          const excecoes = Object.fromEntries(SECCOES.filter((s) => periodos[s] !== periodo).map((s) => [s, periodos[s]]));
+          return { ...resto, periodo, excecoes } as EstadoPersistido;
+        }
+        return { ...antigo, periodo: antigo.periodo ?? "tudo", excecoes: antigo.excecoes ?? {} } as EstadoPersistido;
+      },
       storage: createJSONStorage<EstadoPersistido>(() => localStorageSeguro),
       skipHydration: true,
       partialize: (s): EstadoPersistido => ({
         periodo: s.periodo,
+        excecoes: s.excecoes,
         artistas: soRespostas(s.artistas),
         albuns: soRespostas(s.albuns),
         imagensArtistas: soRespostas(s.imagensArtistas),

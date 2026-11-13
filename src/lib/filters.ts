@@ -3,7 +3,7 @@
  *
  * Funções puras: sem fetch, sem store e sem Date.now().
  */
-import type { Periodo, Scrobble } from "@/types";
+import type { ExcecoesDePeriodo, Periodo, PeriodosPorSeccao, Scrobble, Seccao } from "@/types";
 import { dataDeReferencia, inicioDoPeriodo, timestampScrobble } from "./dates";
 
 /**
@@ -64,4 +64,15 @@ export function filtrarPorArtista(scrobbles: Scrobble[], nome: string): Scrobble
   const alvo = normalizarNome(nome);
   if (!alvo) return [];
   return scrobbles.filter((s) => normalizarNome(s.artist_name) === alvo);
+}
+
+/** As secções do dashboard que podem ter um período diferente do global. */
+export const SECCOES: Seccao[] = ["totais", "artistas", "horas", "musicas", "albuns", "analise"];
+
+/**
+ * O período efetivo de cada secção: a exceção dessa secção, se houver, senão o global.
+ * periodosDasSeccoes("7d", { musicas: "tudo" }) → todas "7d", menos musicas: "tudo".
+ */
+export function periodosDasSeccoes(periodo: Periodo, excecoes: ExcecoesDePeriodo): PeriodosPorSeccao {
+  return Object.fromEntries(SECCOES.map((s) => [s, excecoes[s] ?? periodo])) as PeriodosPorSeccao;
 }
