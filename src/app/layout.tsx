@@ -23,8 +23,7 @@ const archivo = Archivo({
 
 export const metadata: Metadata = {
   title: "fmdata | Music Analytics",
-  description:
-    "Dashboard de estatísticas musicais com dados do Last.fm.",
+  description: "Dashboard de estatísticas musicais com dados do Last.fm.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -36,16 +35,20 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col bg-fundo text-texto">
         <Header />
 
-        <main className="flex-1">
-          {children}
-        </main>
+        <main className="flex-1">{children}</main>
 
         <footer className="bg-rodape text-sm text-white/75">
           <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-6 px-4 py-8 sm:px-6">
             <div>
-              <p className="font-display text-lg font-black italic text-white [font-stretch:125%]">fmdata.</p>
+              <p className="font-display text-lg font-black italic text-white [font-stretch:125%]">
+                fmdata.
+              </p>
               <p className="mt-1">Projeto final de frontend</p>
+              <p className="mt-2 font-semibold text-white">
+                Projeto criado por Jonathan e João
+              </p>
             </div>
+
             <div>
               <p>Dados: Last.fm, através da API fmdata</p>
               <p className="mt-1">Fotos de artistas: Wikimedia Commons</p>
